@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 import os
 import csv
+import re
 
 
 def parse_args():
@@ -24,6 +25,7 @@ def filter_notes(notes_df: pd.DataFrame, admissions_df: pd.DataFrame, admission_
     adm_grownups = admissions_df[admissions_df.ADMISSION_TYPE != "NEWBORN"]
     notes_df = notes_df[notes_df.HADM_ID.isin(adm_grownups.HADM_ID)]
 
+
     # remove notes with no TEXT or HADM_ID
     notes_df = notes_df.dropna(subset=["TEXT", "HADM_ID"])
 
@@ -34,6 +36,7 @@ def filter_notes(notes_df: pd.DataFrame, admissions_df: pd.DataFrame, admission_
     notes_df = notes_df.sort_values(by=["CHARTDATE"])
     notes_df = notes_df.drop_duplicates(subset=["TEXT"], keep="last")
 
+    
     # combine text of same admissions (those are usually addendums)
     combined_adm_texts = notes_df.groupby('HADM_ID')['TEXT'].apply(lambda x: '\n\n'.join(x)).reset_index()
     notes_df = notes_df[notes_df.DESCRIPTION == "Report"]
@@ -41,15 +44,19 @@ def filter_notes(notes_df: pd.DataFrame, admissions_df: pd.DataFrame, admission_
     notes_df = notes_df.drop_duplicates(subset=["HADM_ID"], keep="last")
     notes_df = pd.merge(combined_adm_texts, notes_df, on="HADM_ID", how="inner")
 
+
+
     # strip texts from leading and trailing and white spaces
     notes_df["TEXT"] = notes_df["TEXT"].str.strip()
 
     # remove entries without admission id, subject id or text
     notes_df = notes_df.dropna(subset=["HADM_ID", "SUBJECT_ID", "TEXT"])
 
+
     if admission_text_only:
         # reduce text to admission-only text
         notes_df = filter_admission_text(notes_df)
+
 
     return notes_df
 
@@ -70,19 +77,20 @@ def filter_admission_text(notes_df) -> pd.DataFrame:
     }
 
     # replace linebreak indicators
-    notes_df['TEXT'] = notes_df['TEXT'].str.replace(r"\n", r"\\n")
+    notes_df['TEXT'] = notes_df['TEXT'].str.replace(r"\n", r"\\n").str.lower()
 
     # extract each section by regex
     for key in admission_sections.keys():
         section = admission_sections[key]
-        notes_df[key] = notes_df.TEXT.str.extract(r'(?i){}(.+?)\\n\\n[^(\\|\d|\.)]+?:'
-                                                  .format(section))
+        notes_df[key] = notes_df.TEXT.str.extract(r'(?i){}(.+?)\n\n[^(\\|\d|\.)]+?:'
+                                          .format(section), re.DOTALL)[0]
 
         notes_df[key] = notes_df[key].str.replace(r'\\n', r' ')
         notes_df[key] = notes_df[key].str.strip()
         notes_df[key] = notes_df[key].fillna("")
         notes_df[notes_df[key].str.startswith("[]")][key] = ""
 
+    
     # filter notes with missing main information
     notes_df = notes_df[(notes_df.CHIEF_COMPLAINT != "") | (notes_df.PRESENT_ILLNESS != "") |
                         (notes_df.MEDICAL_HISTORY != "")]

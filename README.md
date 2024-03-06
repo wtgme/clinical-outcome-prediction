@@ -1,4 +1,5 @@
 # Clinical Outcome Prediction from Admission Notes
+THIS Code for MIMIC data only looks at Discharge summary documents as https://github.com/wtgme/clinical-outcome-prediction/blob/master/tasks/mimic_utils.py 
 
 This repository contains source code for the task creation and experiments from our paper [Clinical Outcome Prediction from Admission Notes using Self-Supervised Knowledge Integration](https://www.aclweb.org/anthology/2021.eacl-main.75/), EACL 2021.
 
